@@ -23,8 +23,13 @@ namespace ACBCueConverter
             public string OutDir { get; set; } = "";
             [Option("f", "fallbackTsv", "tsv path", "Specifies the path to the .txt or .tsv to use for mapping AWB IDs to Cue Names.")]
             public string FallbackTsv { get; set; } = "";
-            [Option("c", "cueNames", "boolean", "If true, the Cue Name will be used for Ryo folders instead of the Cue ID.")]
-            public bool CueNames { get; set; } = false;
+            [Option("n", "namedFolders", "boolean", "If true, the Cue Name will be used for Ryo folders instead of the Cue ID.")]
+            public bool NamedFolders { get; set; } = false;
+            [Option("c", "categories", "string", "Add value(s) to use for sound category. (i.e. se: 0, bgm: 1, voice: 2, system: 3, syste_stream: 12)")]
+            public string Categories { get; set; } = "";
+            [Option("v", "volume", "string", "Default volume setting for adx. (1.0 = 100%)")]
+            public string Volume { get; set; } = "1.0";
+
             [Option("m", "mappingTxt", "txt path", "If used, lines from the text file will be used to name Ryo folders.")]
             public string MappingTxt { get; set; } = "";
             [Option("d", "debug", "boolean", "If true, TSVs for processed ACB files will be output next to their locations.")]
@@ -73,6 +78,7 @@ namespace ACBCueConverter
                 if (!Directory.Exists(destination))
                     Directory.Move(folders[i], destination);
             }
+            Console.WriteLine("Done renaming output folders based on text file.");
         }
 
         /*
@@ -107,7 +113,7 @@ namespace ACBCueConverter
                         int cueNameId = nameMap.First(x => x.CueNames.Any(x => x.Equals(cueName))).AwbId;
                         // Create folder named after Cue ID (or Cue Name depending on settings)
                         string cueDir = Path.Combine(options.OutDir, cueNameId + ".cue");
-                        if (options.CueNames)
+                        if (options.NamedFolders)
                         {
                             // the underscore keeps it from being mistaken for a Cue ID
                             cueDir = Path.Combine(options.OutDir, cueName + "_"); 
@@ -117,15 +123,18 @@ namespace ACBCueConverter
                         string outFile = Path.Combine(cueDir, Path.GetFileName(adx));
                         File.Copy(adx, outFile, true);
                         // Create config file for .adx
-                        string outFileConfigPath = Path.Combine(cueDir, Path.GetFileNameWithoutExtension(adx) + ".yaml");
-                        File.WriteAllText(outFileConfigPath, 
-                            $"acb_name: '{Path.GetFileNameWithoutExtension(options.AcbPath)}'\n" +
+                        string configTxt = $"acb_name: '{Path.GetFileNameWithoutExtension(options.AcbPath)}'\n" +
                             $"cue_name: '{cueNameId}'\n" +
                             $"player_id: -1\n" +
-                            $"volume: 1.0" );
+                            $"volume: {options.Volume}";
+                        if (!string.IsNullOrEmpty(options.Categories))
+                            configTxt += $"\ncategory_ids: [{options.Categories}]";
+                        string outFileConfigPath = Path.Combine(cueDir, Path.GetFileNameWithoutExtension(adx) + ".yaml");
+                        File.WriteAllText(outFileConfigPath, configTxt);
                     }
                 }
             }
+            Console.WriteLine("Done copying files to new destination.");
         }
 
         public static List<CueInfo> GetNameMapFromACB()
@@ -141,6 +150,7 @@ namespace ACBCueConverter
                 WriteTSV(awbIDCueNamePairs, outTsvPath);
             }
 
+            Console.WriteLine("Got Cue Name/Cue ID pairs from ACB.");
             return awbIDCueNamePairs;
         }
 
@@ -161,14 +171,13 @@ namespace ACBCueConverter
                 WriteTSV(awbMap, outTsvPath);
             }
 
-            return awbMap;
+            Console.WriteLine("Got Cue Name/Wave ID pairs from ACB.");
 
+            return awbMap;
         }
 
         public static void WriteTSV(List<CueInfo> awbIdCueNamePairs, string outTsvPath)
         {
-            Console.WriteLine();
-
             string outTsvLines = "";
             foreach (var idPair in awbIdCueNamePairs)
             {
@@ -201,10 +210,10 @@ namespace ACBCueConverter
 
             foreach (var track in cues.OrderBy(x => x.Key))
             {
-                if (awbIdCueNamePairs.Any(x => x.AwbId == Convert.ToInt32(track.Key)))
-                    awbIdCueNamePairs.First(x => x.AwbId == Convert.ToInt32(track.Key)).CueNames.Add(track.Value);
+                if (awbIdCueNamePairs.Any(x => x.AwbId == Convert.ToInt32(track.Key + 1)))
+                    awbIdCueNamePairs.First(x => x.AwbId == Convert.ToInt32(track.Key + 1)).CueNames.Add(track.Value);
                 else
-                    awbIdCueNamePairs.Add(new CueInfo { AwbId = Convert.ToInt32(track.Key), CueNames = { track.Value } });
+                    awbIdCueNamePairs.Add(new CueInfo { AwbId = Convert.ToInt32(track.Key + 1), CueNames = { track.Value } });
             }
 
             return awbIdCueNamePairs;
@@ -217,6 +226,8 @@ namespace ACBCueConverter
             var lines = File.ReadAllLines(tsvPath);
             for (int i = 0; i < lines.Count(); i++)
             {
+                // Format to TSV in case input is track title .txt dump using foobar2000 TextUtils plugin
+                // https://www.foobar2000.org/components/view/foo_texttools
                 string line = lines[i].TrimEnd(')').Replace(" (", "\t").Replace("; ", ";");
 
                 CueInfo cue = new CueInfo();
@@ -226,6 +237,8 @@ namespace ACBCueConverter
 
                 cues.Add(cue);
             }
+
+            Console.WriteLine("Got Cue Name/Wave ID pairs from TXT/TSV.");
 
             return cues;
         }
