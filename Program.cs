@@ -25,6 +25,8 @@ namespace ACBCueConverter
             public string FallbackTsv { get; set; } = "";
             [Option("c", "cueNames", "boolean", "If true, the Cue Name will be used for Ryo folders instead of the Cue ID.")]
             public bool CueNames { get; set; } = false;
+            [Option("m", "mappingTxt", "txt path", "If used, lines from the text file will be used to name Ryo folders.")]
+            public string MappingTxt { get; set; } = "";
             [Option("d", "debug", "boolean", "If true, TSVs for processed ACB files will be output next to their locations.")]
             public bool Debug { get; set; } = false;
 
@@ -52,6 +54,25 @@ namespace ACBCueConverter
             var awbMap = GetAwbMapFromACB();
 
             CopyFilesToNewDestination(nameMap, awbMap);
+            RenameFoldersFromMapTxt();
+        }
+
+        private static void RenameFoldersFromMapTxt()
+        {
+            string[] mappedNames = new string[] { };
+            if (File.Exists(options.MappingTxt))
+                mappedNames = File.ReadAllLines(options.MappingTxt);
+            else
+                return;
+
+            var folders = Directory.GetDirectories(options.OutDir);
+
+            for (int i = 0; i < mappedNames.Length; i++)
+            {
+                string destination = Path.Combine(options.OutDir, mappedNames[i]);
+                if (!Directory.Exists(destination))
+                    Directory.Move(folders[i], destination);
+            }
         }
 
         /*
