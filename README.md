@@ -19,6 +19,9 @@ Note: Cue Names shared by multiple AWB Indices will be appended to Line 2 of the
 ...
 ```
 
+# Known Issues
+- Only works with ACB files that don't contain a mix of streaming and non-streaming audio.
+
 # Credit
 [EVTUI](https://github.com/DarkPsydeOfTheMoon/EVTUI) - Ported ACB parsing code
 [XV2-Tools](https://github.com/LazyBone152/XV2-Tools) - Original ACB parsing code
