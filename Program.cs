@@ -51,21 +51,43 @@ namespace ACBCueConverter
             CopyFilesToNewDestination(nameMap, awbMap);
         }
 
+        /*
+        
+        awbMap.tsv
+        AWB => CUE NAMES
+        the 0th ADX in the AWB is assigned to a Cue named 118.
+        That means 00000_streaming.adx needs to be copied to ???.cue
+
+        nameMap.tsv
+        CUE ID => CUE NAME
+        The cue named 118 has cue ID 22.
+        That means 00000_streaming.adx needs to be copied to 22.cue
+
+        */
+
         private static void CopyFilesToNewDestination(List<CueInfo> nameMap, List<CueInfo> awbMap)
         {
+            // For each adx file in input folder...
             foreach (var adx in Directory.GetFiles(options.InputDir, "*.adx", SearchOption.TopDirectoryOnly))
             {
+                // Get the _streaming ID (awb ID).
                 int adxId = Convert.ToInt32(Path.GetFileNameWithoutExtension(adx).Split('_')[0]);
+                
+                // If AWB ID is in list mapping it to cue name...
                 if (awbMap.Any(x => x.AwbId == adxId))
                 {
+                    // Get each cue name from list
                     foreach (var cueName in awbMap.First(x => x.AwbId == adxId).CueNames)
                     {
+                        // Get ID of Cue based on name
                         int cueNameId = nameMap.First(x => x.CueNames.Any(x => x.Equals(cueName))).AwbId;
-
+                        // Create folder named after Cue ID
                         string cueDir = Path.Combine(options.OutDir, cueNameId + ".cue");
                         Directory.CreateDirectory(cueDir);
+                        // Copy adx to Cue ID folder
                         string outFile = Path.Combine(cueDir, Path.GetFileName(adx));
                         File.Copy(adx, outFile, true);
+                        // Create config file for .adx
                         string outFileConfigPath = Path.Combine(cueDir, Path.GetFileNameWithoutExtension(adx) + ".yaml");
                         File.WriteAllText(outFileConfigPath, "player_id: -1\nvolume: 1.0");
                     }
@@ -78,7 +100,7 @@ namespace ACBCueConverter
             AcbFile loadedAcb = new AcbFile();
             loadedAcb.Load(options.AcbPath);
 
-            var awbIDCueNamePairs = GetAwbIDCueNamePairs(loadedAcb.Cues);
+            var awbIDCueNamePairs = GetCueNameIDPairs(loadedAcb.Cues);
 
             if (options.Debug)
             {
@@ -140,7 +162,7 @@ namespace ACBCueConverter
             return awbIdCueNamePairs;
         }
 
-        private static List<CueInfo> GetAwbIDCueNamePairs(Dictionary<short, string> cues)
+        private static List<CueInfo> GetCueNameIDPairs(Dictionary<short, string> cues)
         {
             List<CueInfo> awbIdCueNamePairs = new List<CueInfo>();
 
