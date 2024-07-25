@@ -15,13 +15,13 @@ namespace ACBCueConverter
 
         public class ProgramOptions
         {
-            [Option("a", "acbPath", "acb path", "Specifies the path to the ACB file to get Cue Names and AWB IDs from.", Required = true)]
+            [Option("a", "acbPath", "acb path", "Specifies the path to the ACB file to get Cue Names and Wave IDs from.", Required = true)]
             public string AcbPath { get; set; } = "";
             [Option("i", "inputDir", "directory path", "Specifies the path to the directory with FEmulator .adx to copy.", Required = true)]
             public string InputDir { get; set; } = "";
             [Option("o", "outDir", "directory path", "Specifies the path to the Ryo ACB directory to output .adx to.", Required = true)]
             public string OutDir { get; set; } = "";
-            [Option("f", "fallbackTsv", "tsv path", "Specifies the path to the .txt or .tsv to use for mapping AWB IDs to Cue Names.")]
+            [Option("f", "fallbackTsv", "tsv path", "Specifies the path to the .txt or .tsv to use for mapping Wave IDs to Cue Names.")]
             public string FallbackTsv { get; set; } = "";
             [Option("n", "namedFolders", "boolean", "If true, the Cue Name will be used for Ryo folders instead of the Cue ID.")]
             public bool NamedFolders { get; set; } = false;
@@ -29,12 +29,14 @@ namespace ACBCueConverter
             public string Categories { get; set; } = "";
             [Option("v", "volume", "string", "Default volume setting for adx. (1.0 = 100%)")]
             public string Volume { get; set; } = "1.0";
-
             [Option("m", "mappingTxt", "txt path", "If used, lines from the text file will be used to name Ryo folders.")]
             public string MappingTxt { get; set; } = "";
+            [Option("s", "swap", "boolean", "If true, read Wave IDs from the end of filename (ACE output).")]
+            public bool Swap { get; set; } = false;
+            [Option("of", "offset", "interger", "Add this amount to the start of the Cue Name ID mapping.")]
+            public int Offset { get; set; } = 0;
             [Option("d", "debug", "boolean", "If true, TSVs for processed ACB files will be output next to their locations.")]
             public bool Debug { get; set; } = false;
-
         }
 
         static void Main(string[] args)
@@ -81,36 +83,29 @@ namespace ACBCueConverter
             Console.WriteLine("Done renaming output folders based on text file.");
         }
 
-        /*
-        
-        awbMap.tsv
-        AWB => CUE NAMES
-        the 0th ADX in the AWB is assigned to a Cue named 118.
-        That means 00000_streaming.adx needs to be copied to ???.cue
-
-        nameMap.tsv
-        CUE ID => CUE NAME
-        The cue named 118 has cue ID 22.
-        That means 00000_streaming.adx needs to be copied to 22.cue
-
-        */
-
         private static void CopyFilesToNewDestination(List<CueInfo> nameMap, List<CueInfo> awbMap)
         {
+            // Get adx files in input directory
+            var adxFiles = Directory.GetFiles(options.InputDir, "*.adx", SearchOption.TopDirectoryOnly);
+
             // For each adx file in input folder...
-            foreach (var adx in Directory.GetFiles(options.InputDir, "*.adx", SearchOption.TopDirectoryOnly))
+            foreach (var adx in adxFiles)
             {
                 // Get the _streaming ID (awb ID).
-                int adxId = Convert.ToInt32(Path.GetFileNameWithoutExtension(adx).Split('_')[0]);
+                int adxId = -1;
+                if (options.Swap) // Optionally read ACE output filename format
+                    adxId = Convert.ToInt32(Path.GetFileNameWithoutExtension(adx).Split('(').Last().TrimEnd(')'));
+                else // otherwise use SonicAudioTools output filename format
+                    adxId = Convert.ToInt32(Path.GetFileNameWithoutExtension(adx).Split('_')[0]);
                 
                 // If AWB ID is in list mapping it to cue name...
-                if (awbMap.Any(x => x.AwbId == adxId))
+                if (awbMap.Any(x => x.WaveID == adxId))
                 {
                     // Get each cue name from list
-                    foreach (var cueName in awbMap.First(x => x.AwbId == adxId).CueNames)
+                    foreach (var cueName in awbMap.First(x => x.WaveID == adxId).CueNames)
                     {
                         // Get ID of Cue based on name
-                        int cueNameId = nameMap.First(x => x.CueNames.Any(x => x.Equals(cueName))).AwbId;
+                        int cueNameId = nameMap.First(x => x.CueNames.Any(x => x.Equals(cueName))).WaveID;
                         // Create folder named after Cue ID (or Cue Name depending on settings)
                         string cueDir = Path.Combine(options.OutDir, cueNameId + ".cue");
                         if (options.NamedFolders)
@@ -142,16 +137,16 @@ namespace ACBCueConverter
             AcbFile loadedAcb = new AcbFile();
             loadedAcb.Load(options.AcbPath);
 
-            var awbIDCueNamePairs = GetCueNameIDPairs(loadedAcb.Cues);
+            var WaveIDCueNamePairs = GetCueNameIDPairs(loadedAcb.Cues);
 
             if (options.Debug)
             {
                 string outTsvPath = FileSys.GetExtensionlessPath(options.AcbPath) + "_nameMap.tsv";
-                WriteTSV(awbIDCueNamePairs, outTsvPath);
+                WriteTSV(WaveIDCueNamePairs, outTsvPath);
             }
 
             Console.WriteLine("Got Cue Name/Cue ID pairs from ACB.");
-            return awbIDCueNamePairs;
+            return WaveIDCueNamePairs;
         }
 
         public static List<CueInfo> GetAwbMapFromACB()
@@ -163,7 +158,7 @@ namespace ACBCueConverter
                 
                 return GetCueListFromTsv(options.FallbackTsv);
             }
-            var awbMap = GetAwbIDCueNamePairs(acb.TrackList);
+            var awbMap = GetWaveIDCueNamePairs(acb.TrackList);
 
             if (options.Debug)
             {
@@ -176,12 +171,12 @@ namespace ACBCueConverter
             return awbMap;
         }
 
-        public static void WriteTSV(List<CueInfo> awbIdCueNamePairs, string outTsvPath)
+        public static void WriteTSV(List<CueInfo> WaveIDCueNamePairs, string outTsvPath)
         {
             string outTsvLines = "";
-            foreach (var idPair in awbIdCueNamePairs)
+            foreach (var idPair in WaveIDCueNamePairs)
             {
-                string newLine = $"\n{idPair.AwbId}\t{string.Join(';', idPair.CueNames)}";
+                string newLine = $"\n{idPair.WaveID}\t{string.Join(';', idPair.CueNames)}";
                 //Console.WriteLine(newLine);
                 outTsvLines += newLine;
             }
@@ -189,34 +184,34 @@ namespace ACBCueConverter
             File.WriteAllText(outTsvPath, outTsvLines);
         }
 
-        public static List<CueInfo> GetAwbIDCueNamePairs(ObservableCollection<TrackEntry> trackList)
+        public static List<CueInfo> GetWaveIDCueNamePairs(ObservableCollection<TrackEntry> trackList)
         {
-            List<CueInfo> awbIdCueNamePairs = new List<CueInfo>();
+            List<CueInfo> WaveIDCueNamePairs = new List<CueInfo>();
 
-            foreach (var track in trackList.OrderBy(x => x.AwbId))
+            foreach (var track in trackList.OrderBy(x => x.WaveID))
             {
-                if (awbIdCueNamePairs.Any(x => x.AwbId == track.AwbId))
-                    awbIdCueNamePairs.First(x => x.AwbId == track.AwbId).CueNames.Add(track.CueName);
+                if (WaveIDCueNamePairs.Any(x => x.WaveID == track.WaveID))
+                    WaveIDCueNamePairs.First(x => x.WaveID == track.WaveID).CueNames.Add(track.CueName);
                 else
-                    awbIdCueNamePairs.Add(new CueInfo { AwbId = track.AwbId, CueNames = { track.CueName }  });
+                    WaveIDCueNamePairs.Add(new CueInfo { WaveID = track.WaveID, CueNames = { track.CueName }  });
             }
 
-            return awbIdCueNamePairs;
+            return WaveIDCueNamePairs;
         }
 
         private static List<CueInfo> GetCueNameIDPairs(Dictionary<short, string> cues)
         {
-            List<CueInfo> awbIdCueNamePairs = new List<CueInfo>();
+            List<CueInfo> WaveIDCueNamePairs = new List<CueInfo>();
 
             foreach (var track in cues.OrderBy(x => x.Key))
             {
-                if (awbIdCueNamePairs.Any(x => x.AwbId == Convert.ToInt32(track.Key + 1)))
-                    awbIdCueNamePairs.First(x => x.AwbId == Convert.ToInt32(track.Key + 1)).CueNames.Add(track.Value);
+                if (WaveIDCueNamePairs.Any(x => x.WaveID == Convert.ToInt32(track.Key + options.Offset)))
+                    WaveIDCueNamePairs.First(x => x.WaveID == Convert.ToInt32(track.Key + options.Offset)).CueNames.Add(track.Value);
                 else
-                    awbIdCueNamePairs.Add(new CueInfo { AwbId = Convert.ToInt32(track.Key + 1), CueNames = { track.Value } });
+                    WaveIDCueNamePairs.Add(new CueInfo { WaveID = Convert.ToInt32(track.Key + options.Offset), CueNames = { track.Value } });
             }
 
-            return awbIdCueNamePairs;
+            return WaveIDCueNamePairs;
         }
 
         private static List<CueInfo> GetCueListFromTsv(string tsvPath)
@@ -232,7 +227,7 @@ namespace ACBCueConverter
 
                 CueInfo cue = new CueInfo();
 
-                cue.AwbId = i;
+                cue.WaveID = i;
                 cue.CueNames = line.Split('\t')[1].Split(';').ToList();
 
                 cues.Add(cue);
@@ -245,8 +240,16 @@ namespace ACBCueConverter
 
         public class CueInfo
         {
-            public int AwbId = -1;
+            public int WaveID = -1;
             public List<string> CueNames = new List<string>();
+
+        }
+
+        public class Cue
+        {
+            public string Name = "";
+            public short ID = -1;
+            public List<int> WaveIDs = new List<int>();
         }
     }
 }
