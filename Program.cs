@@ -23,25 +23,28 @@ namespace ACBCueConverter
             public string OutDir { get; set; } = "";
             [Option("f", "fallbackTsv", "tsv path", "Specifies the path to the .txt or .tsv to use for mapping AWB IDs to Cue Names.")]
             public string FallbackTsv { get; set; } = "";
+            [Option("c", "cueNames", "boolean", "If true, the Cue Name will be used for Ryo folders instead of the Cue ID.")]
+            public bool CueNames { get; set; } = false;
             [Option("d", "debug", "boolean", "If true, TSVs for processed ACB files will be output next to their locations.")]
             public bool Debug { get; set; } = false;
+
         }
 
         static void Main(string[] args)
         {
             string about = SimpleCommandLineFormatter.Default.FormatAbout<ProgramOptions>("ShrineFox",
                 "Outputs ADX files from AWBEmulator format to Ryo format based on a TSV file.");
+            
             try
             {
                 options = SimpleCommandLineParser.Default.Parse<ProgramOptions>(args);
             }
             catch (Exception e)
             {
+                Console.WriteLine(about);
                 Console.WriteLine(e.Message);
                 return;
             }
-
-            Console.WriteLine(about);
 
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
@@ -81,15 +84,24 @@ namespace ACBCueConverter
                     {
                         // Get ID of Cue based on name
                         int cueNameId = nameMap.First(x => x.CueNames.Any(x => x.Equals(cueName))).AwbId;
-                        // Create folder named after Cue ID
+                        // Create folder named after Cue ID (or Cue Name depending on settings)
                         string cueDir = Path.Combine(options.OutDir, cueNameId + ".cue");
+                        if (options.CueNames)
+                        {
+                            // the underscore keeps it from being mistaken for a Cue ID
+                            cueDir = Path.Combine(options.OutDir, cueName + "_"); 
+                        }
                         Directory.CreateDirectory(cueDir);
                         // Copy adx to Cue ID folder
                         string outFile = Path.Combine(cueDir, Path.GetFileName(adx));
                         File.Copy(adx, outFile, true);
                         // Create config file for .adx
                         string outFileConfigPath = Path.Combine(cueDir, Path.GetFileNameWithoutExtension(adx) + ".yaml");
-                        File.WriteAllText(outFileConfigPath, "player_id: -1\nvolume: 1.0");
+                        File.WriteAllText(outFileConfigPath, 
+                            $"acb_name: '{Path.GetFileNameWithoutExtension(options.AcbPath)}'\n" +
+                            $"cue_name: '{cueNameId}'\n" +
+                            $"player_id: -1\n" +
+                            $"volume: 1.0" );
                     }
                 }
             }
@@ -140,7 +152,7 @@ namespace ACBCueConverter
             foreach (var idPair in awbIdCueNamePairs)
             {
                 string newLine = $"\n{idPair.AwbId}\t{string.Join(';', idPair.CueNames)}";
-                Console.WriteLine(newLine);
+                //Console.WriteLine(newLine);
                 outTsvLines += newLine;
             }
 
