@@ -2,7 +2,7 @@
 
 namespace ACBCueConverter
 {
-    internal class Program
+    internal partial class Program
     {
         public static ProgramOptions options;
 
@@ -18,6 +18,11 @@ namespace ACBCueConverter
             public string Categories { get; set; } = "2";
             [Option("v", "volume", "string", "Default volume setting for adx (default: 0.4). (0.4 = 40%)")]
             public string Volume { get; set; } = "0.4";
+            [Option("a", "archive", "file path", "Specifies the path to the ACB to get Cue IDs and Cue Names from.")]
+            public string Archive { get; set; } = "";
+            [Option("t", "text", "file path", "Specifies the path to the TXT to get Wave IDs and Cue Names from.")]
+            public string Text { get; set; } = "";
+
         }
 
         public static List<Adx> AdxFiles = new List<Adx>();
@@ -38,11 +43,60 @@ namespace ACBCueConverter
                 return;
             }
 
-            CopyFilesToNewDestination();
+            if (!File.Exists(options.Archive))
+                CopyACEFilesToNewDestination();
+            else
+                CopySonicAudioToolsFilesToNewDestination();
         }
 
+        private static void CopySonicAudioToolsFilesToNewDestination()
+        {
+            // Get list of Wave IDs matched to Cue IDs by name
+            var AcbEntries = MatchedCueNames(GetCueNameCueIDPairsFromACB(), GetCueNameWaveIDPairsFromACB());
 
-        private static void CopyFilesToNewDestination()
+            // Get adx files in input directory
+            var adxPaths = Directory.GetFiles(options.InputDir, "*.adx", SearchOption.TopDirectoryOnly);
+
+            // For each Streaming adx file in input folder...
+            foreach (var adxPath in adxPaths.Where(x => Path.GetFileName(x).Contains("_streaming")))
+            {
+                int waveId = Convert.ToInt32(Path.GetFileNameWithoutExtension(adxPath).Split('_')[0]);
+                AcbEntries.First(x => x.WaveID == waveId).Path = adxPath;
+                AcbEntries.First(x => x.WaveID == waveId).Streaming = true;
+            }
+
+            // For each Non-Streaming adx file in input folder...
+            foreach (var adxPath in adxPaths.Where(x => !Path.GetFileName(x).Contains("_streaming")))
+            {
+                int waveId = Convert.ToInt32(Path.GetFileNameWithoutExtension(adxPath).Split('_')[0]);
+                AcbEntries.First(x => x.WaveID == waveId).Path = adxPath;
+                AcbEntries.First(x => x.WaveID == waveId).Streaming = false;
+            }
+
+            foreach (var adx in AdxFiles.OrderBy(x => x.CueID))
+            {
+                // Create output directory
+                string cueDir = Path.Combine(options.OutDir, adx.CueID + ".cue");
+                // Folders retain Cue Name (underscore at end to prevent being mistaken for Cue ID)
+                if (options.NamedFolders)
+                    cueDir = Path.Combine(options.OutDir, adx.CueName + "_");
+                Directory.CreateDirectory(cueDir);
+                // Copy adx to Cue ID folder
+                string outFile = Path.Combine(cueDir, Path.GetFileName(adx.Path));
+                File.Copy(adx.Path, outFile, true);
+                // Create config file for .adx
+                string configTxt = $"cue_name: '{adx.CueID}'\n" +
+                    $"player_id: -1\n" +
+                    $"volume: {options.Volume}\n" +
+                    $"category_ids: [{options.Categories}]";
+                string outFileConfigPath = Path.Combine(cueDir, Path.GetFileNameWithoutExtension(adx.Path) + ".yaml");
+                File.WriteAllText(outFileConfigPath, configTxt);
+            }
+
+            Console.WriteLine("Done copying files to new destination.");
+        }
+
+        private static void CopyACEFilesToNewDestination()
         {
             // Get adx files in input directory
             var adxPaths = Directory.GetFiles(options.InputDir, "*.adx", SearchOption.TopDirectoryOnly);
@@ -86,12 +140,5 @@ namespace ACBCueConverter
             Console.WriteLine("Done copying files to new destination.");
         }
 
-        public class Adx
-        {
-            public string Path = "";
-            public string CueName = "";
-            public short WaveID = -1;
-            public short CueID = -1;
-        }
     }
 }
