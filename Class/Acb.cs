@@ -47,7 +47,7 @@ namespace ACBCueConverter
 
             if (acb.TrackList == null)
             {
-                Console.WriteLine($"Unable to read TrackList from ACB, using fallback: {Path.GetFileName(options.Archive)}");
+                Console.WriteLine($"Unable to read TrackList from ACB, using fallback text file: {Path.GetFileName(options.Text)}");
                 return GetCueNameWaveIDPairsFromText(options.Text);
             }
             else

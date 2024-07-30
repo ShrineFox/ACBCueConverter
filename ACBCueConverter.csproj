@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\DRV3-Sharp\V3Lib\V3Lib.csproj" />
     <ProjectReference Include="..\SimpleCommandline\Source\SimpleCommandLine\SimpleCommandLine.csproj" />
   </ItemGroup>
 

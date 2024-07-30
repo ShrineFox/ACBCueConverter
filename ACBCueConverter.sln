@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ACBCueConverter", "ACBCueCo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleCommandLine", "..\SimpleCommandline\Source\SimpleCommandLine\SimpleCommandLine.csproj", "{7A1F22A9-5EED-4F8D-A3C9-A99B8ECFACB0}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "V3Lib", "..\DRV3-Sharp\V3Lib\V3Lib.csproj", "{80BFD093-8BF5-46BB-8C58-2304B2F9BFCC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{7A1F22A9-5EED-4F8D-A3C9-A99B8ECFACB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7A1F22A9-5EED-4F8D-A3C9-A99B8ECFACB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7A1F22A9-5EED-4F8D-A3C9-A99B8ECFACB0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{80BFD093-8BF5-46BB-8C58-2304B2F9BFCC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{80BFD093-8BF5-46BB-8C58-2304B2F9BFCC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{80BFD093-8BF5-46BB-8C58-2304B2F9BFCC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{80BFD093-8BF5-46BB-8C58-2304B2F9BFCC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

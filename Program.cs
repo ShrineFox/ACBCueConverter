@@ -25,8 +25,6 @@ namespace ACBCueConverter
 
         }
 
-        public static List<Adx> AdxFiles = new List<Adx>();
-
         static void Main(string[] args)
         {
             string about = SimpleCommandLineFormatter.Default.FormatAbout<ProgramOptions>("ShrineFox",
@@ -57,23 +55,31 @@ namespace ACBCueConverter
             // Get adx files in input directory
             var adxPaths = Directory.GetFiles(options.InputDir, "*.adx", SearchOption.TopDirectoryOnly);
 
-            // For each Streaming adx file in input folder...
-            foreach (var adxPath in adxPaths.Where(x => Path.GetFileName(x).Contains("_streaming")))
+            List<Adx> NewAcbEntries = new List<Adx>();
+
+            // For each adx file in input folder...
+            foreach (var adxPath in adxPaths)
             {
-                int waveId = Convert.ToInt32(Path.GetFileNameWithoutExtension(adxPath).Split('_')[0]);
-                AcbEntries.First(x => x.WaveID == waveId).Path = adxPath;
-                AcbEntries.First(x => x.WaveID == waveId).Streaming = true;
+                // Get Wave ID from filename
+                var Adx = new Adx() { Path = adxPath };
+                Adx.WaveID = Convert.ToInt32(Path.GetFileNameWithoutExtension(adxPath).Split('_')[0]);
+
+                // Get whether it's streamed or not from filename
+                if (Path.GetFileNameWithoutExtension(adxPath).Split('_')[0] == "streaming")
+                    Adx.Streaming = true;
+
+                // Add to new list of entries if it matches an existing record by Wave ID
+                if (AcbEntries.Any(x => x.WaveID == Adx.WaveID))
+                {
+                    var matchingEntry = AcbEntries.First(x => x.WaveID == Adx.WaveID);
+                    Adx.CueName = matchingEntry.CueName;
+                    Adx.CueID = matchingEntry.CueID;
+
+                    NewAcbEntries.Add(Adx);
+                }
             }
 
-            // For each Non-Streaming adx file in input folder...
-            foreach (var adxPath in adxPaths.Where(x => !Path.GetFileName(x).Contains("_streaming")))
-            {
-                int waveId = Convert.ToInt32(Path.GetFileNameWithoutExtension(adxPath).Split('_')[0]);
-                AcbEntries.First(x => x.WaveID == waveId).Path = adxPath;
-                AcbEntries.First(x => x.WaveID == waveId).Streaming = false;
-            }
-
-            foreach (var adx in AdxFiles.OrderBy(x => x.CueID))
+            foreach (var adx in NewAcbEntries.OrderBy(x => x.CueID))
             {
                 // Create output directory
                 string cueDir = Path.Combine(options.OutDir, adx.CueID + ".cue");
@@ -101,6 +107,7 @@ namespace ACBCueConverter
             // Get adx files in input directory
             var adxPaths = Directory.GetFiles(options.InputDir, "*.adx", SearchOption.TopDirectoryOnly);
 
+            var AdxFiles = new List<Adx>();
             // For each adx file in input folder...
             foreach (var adxPath in adxPaths)
             {
