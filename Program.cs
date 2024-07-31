@@ -23,6 +23,8 @@ namespace ACBCueConverter
             public string Volume { get; set; } = "0.4";
             [Option("an", "appendname", "string", "Text to append to the end of a Named Folder.")]
             public string AppendName { get; set; } = "";
+            [Option("acbn", "acbname", "string", "Text to use for ACB name in .yaml.")]
+            public string AcbName { get; set; } = "";
         }
 
         public class Adx
@@ -125,7 +127,10 @@ namespace ACBCueConverter
                 string outFile = Path.Combine(cueDir, Path.GetFileName(adx.Path));
                 File.Copy(adx.Path, outFile, true);
                 // Create config file for .adx
-                string configTxt = $"cue_name: '{adx.CueName}'\n" +
+                string configTxt = "";
+                if (!string.IsNullOrEmpty(options.AcbName))
+                    configTxt = $"acb_name: '{options.AcbName}'\n";
+                configTxt += $"cue_name: '{adx.CueName}'\n" +
                     $"player_id: -1\n" +
                     $"volume: {options.Volume}\n" +
                     $"category_ids: [{options.Categories}]";
